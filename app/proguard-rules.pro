@@ -1,0 +1,3 @@
+-repackageclasses 'es.chiteroman.framework'
+-dontobfuscate
+-keep class es.chiteroman.framework.Main {public <methods>;}
