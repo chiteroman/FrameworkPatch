@@ -75,7 +75,7 @@ It may be different in your .smali file. Do not copy and paste...
 
 Before aput operation, you must add this:
 ```
-invoke-static {XX}, Les/chiteroman/framework/Main;->modifyCertificate(Ljava/security/cert/Certificate;)Ljava/security/cert/Certificate;
+invoke-static {XX}, Lcom/android/internal/util/framework/Android;->modifyCertificate(Ljava/security/cert/Certificate;)Ljava/security/cert/Certificate;
 move-result-object XX
 ```
 
@@ -83,7 +83,7 @@ Replace XX with the leaf certificate register.
 
 So the final code (in this example) should be this:
 ```
-invoke-static {v0}, Les/chiteroman/framework/Main;->modifyCertificate(Ljava/security/cert/Certificate;)Ljava/security/cert/Certificate;
+invoke-static {v0}, Lcom/android/internal/util/framework/Android;->modifyCertificate(Ljava/security/cert/Certificate;)Ljava/security/cert/Certificate;
 move-result-object v0
 aput-object v0, v2, v3
 return-object v2
@@ -93,7 +93,7 @@ return-object v2
 
 Search for "newApplication" methods and before the return operation, add this:
 ```
-invoke-static {XX}, Les/chiteroman/framework/Main;->onNewApp(Landroid/content/Context;)V
+invoke-static {XX}, Lcom/android/internal/util/framework/Android;->onNewApp(Landroid/content/Context;)V
 ```
 
 Replace XX with the Context register.

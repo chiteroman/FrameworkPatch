@@ -1,8 +1,5 @@
-package es.chiteroman.framework;
+package com.android.internal.util.framework;
 
-import android.app.Application;
-import android.content.Context;
-import android.os.Build;
 import android.util.Log;
 
 import org.bouncycastle.asn1.ASN1Boolean;
@@ -25,64 +22,50 @@ import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+import org.lsposed.lsparanoid.Obfuscate;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.lang.reflect.Field;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
-import java.util.HashMap;
-import java.util.concurrent.ThreadLocalRandom;
 
-public class Main {
+@Obfuscate
+public final class Android {
+    private static final String TAG = "chiteroman";
     private static final PrivateKey EC, RSA;
-    private static final HashMap<String, String> map = new HashMap<>();
+    private static final ASN1ObjectIdentifier OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17");
+    private static final String EC_PRIVATE_KEY = """
+            """;
+    private static final String RSA_PRIVATE_KEY = """
+            """;
 
     static {
-        modifyCertificate(null);
-        onNewApp(null);
 
-        map.put("MANUFACTURER", "");
-        map.put("BRAND", "");
-        map.put("DEVICE", "");
-        map.put("PRODUCT", "");
-        map.put("MODEL", "");
-        map.put("FINGERPRINT", "");
-
-        String ec = """
-                -----BEGIN EC PRIVATE KEY-----
-                -----END EC PRIVATE KEY-----""";
-
-        String rsa = """
-                -----BEGIN RSA PRIVATE KEY-----
-                -----END RSA PRIVATE KEY-----""";
-
-        try (PEMParser parser = new PEMParser(new StringReader(ec))) {
+        try (PEMParser parser = new PEMParser(new StringReader(EC_PRIVATE_KEY))) {
             PEMKeyPair pemKeyPair = (PEMKeyPair) parser.readObject();
             EC = new JcaPEMKeyConverter().getPrivateKey(pemKeyPair.getPrivateKeyInfo());
         } catch (IOException e) {
-            Log.e("chiteroman", e.toString());
+            Log.e(TAG, e.toString());
             throw new RuntimeException(e);
         }
 
-        try (PEMParser parser = new PEMParser(new StringReader(rsa))) {
+        try (PEMParser parser = new PEMParser(new StringReader(RSA_PRIVATE_KEY))) {
             PEMKeyPair pemKeyPair = (PEMKeyPair) parser.readObject();
             RSA = new JcaPEMKeyConverter().getPrivateKey(pemKeyPair.getPrivateKeyInfo());
         } catch (IOException e) {
-            Log.e("chiteroman", e.toString());
+            Log.e(TAG, e.toString());
             throw new RuntimeException(e);
         }
     }
 
     public static Certificate modifyCertificate(Certificate certificate) {
-        if (!(certificate instanceof X509Certificate x509Certificate)) return certificate;
+        if (certificate == null) return null;
         try {
-            X509CertificateHolder holder = new X509CertificateHolder(x509Certificate.getEncoded());
+            X509CertificateHolder holder = new X509CertificateHolder(certificate.getEncoded());
 
-            ASN1ObjectIdentifier oid = new ASN1ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17");
-
-            Extension ext = holder.getExtension(oid);
+            Extension ext = holder.getExtension(OID);
 
             if (ext == null) return certificate;
 
@@ -99,11 +82,13 @@ public class Main {
                 vector.add(taggedObject);
             }
 
+            SecureRandom random = new SecureRandom();
+
             byte[] verifiedBootKey = new byte[32];
             byte[] verifiedBootHash = new byte[32];
 
-            ThreadLocalRandom.current().nextBytes(verifiedBootKey);
-            ThreadLocalRandom.current().nextBytes(verifiedBootHash);
+            random.nextBytes(verifiedBootKey);
+            random.nextBytes(verifiedBootHash);
 
             ASN1Encodable[] rootOfTrustEnc = {new DEROctetString(verifiedBootKey), ASN1Boolean.TRUE, new ASN1Enumerated(0), new DEROctetString(verifiedBootHash)};
 
@@ -121,9 +106,11 @@ public class Main {
 
             ASN1OctetString hackedSeqOctets = new DEROctetString(hackedSeq);
 
-            Extension hackedExt = new Extension(oid, false, hackedSeqOctets);
+            Extension hackedExt = new Extension(OID, false, hackedSeqOctets);
 
             X509v3CertificateBuilder builder = new X509v3CertificateBuilder(holder).replaceExtension(hackedExt);
+
+            X509Certificate x509Certificate = new JcaX509CertificateConverter().getCertificate(holder);
 
             JcaContentSignerBuilder signerBuilder = new JcaContentSignerBuilder(x509Certificate.getSigAlgName());
 
@@ -140,51 +127,8 @@ public class Main {
             return new JcaX509CertificateConverter().getCertificate(hackedCert);
 
         } catch (Throwable t) {
-            Log.e("chiteroman", t.toString());
+            Log.e(TAG, t.toString());
         }
         return certificate;
-    }
-
-    private static Field getFieldByName(String name) {
-
-        Field field;
-        try {
-            field = Build.class.getDeclaredField(name);
-        } catch (NoSuchFieldException e) {
-            try {
-                field = Build.VERSION.class.getDeclaredField(name);
-            } catch (NoSuchFieldException ex) {
-                return null;
-            }
-        }
-
-        field.setAccessible(true);
-
-        return field;
-    }
-
-    public static void onNewApp(Context context) {
-        if (context == null) return;
-
-        final String packageName = context.getPackageName();
-        final String processName = Application.getProcessName();
-
-        if (packageName == null || processName == null) return;
-
-        if (packageName.equals("com.google.android.gms") && processName.equals("com.google.android.gms.unstable")) {
-            try {
-                map.forEach((s, s2) -> {
-                    Field field = getFieldByName(s);
-                    if (field == null) return;
-                    try {
-                        field.set(null, s2);
-                    } catch (Throwable t) {
-                        Log.e("chiteroman", t.toString());
-                    }
-                });
-            } catch (Throwable t) {
-                Log.e("chiteroman", t.toString());
-            }
-        }
     }
 }

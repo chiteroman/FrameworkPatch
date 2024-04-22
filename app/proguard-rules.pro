@@ -1,3 +1,2 @@
--repackageclasses 'es.chiteroman.framework'
--dontobfuscate
--keep class es.chiteroman.framework.Main {public <methods>;}
+-repackageclasses 'com.android.internal.util.framework'
+-keep class com.android.internal.util.framework.Android {public <methods>;}
