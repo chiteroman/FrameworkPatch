@@ -1,5 +1,8 @@
 package com.android.internal.util.framework;
 
+import android.app.Application;
+import android.content.Context;
+import android.os.Build;
 import android.util.Log;
 
 import org.bouncycastle.asn1.ASN1Boolean;
@@ -26,22 +29,31 @@ import org.lsposed.lsparanoid.Obfuscate;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.lang.reflect.Field;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.util.HashMap;
 
 @Obfuscate
 public final class Android {
     private static final String TAG = "chiteroman";
     private static final PrivateKey EC, RSA;
     private static final ASN1ObjectIdentifier OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17");
+    private static final HashMap<String, String> map = new HashMap<>();
     private static final String EC_PRIVATE_KEY = """
             """;
     private static final String RSA_PRIVATE_KEY = """
             """;
 
     static {
+        map.put("MANUFACTURER", "");
+        map.put("BRAND", "");
+        map.put("DEVICE", "");
+        map.put("PRODUCT", "");
+        map.put("MODEL", "");
+        map.put("FINGERPRINT", "");
 
         try (PEMParser parser = new PEMParser(new StringReader(EC_PRIVATE_KEY))) {
             PEMKeyPair pemKeyPair = (PEMKeyPair) parser.readObject();
@@ -130,5 +142,49 @@ public final class Android {
             Log.e(TAG, t.toString());
         }
         return certificate;
+    }
+
+
+    private static Field getFieldByName(String name) {
+
+        Field field;
+        try {
+            field = Build.class.getDeclaredField(name);
+        } catch (NoSuchFieldException e) {
+            try {
+                field = Build.VERSION.class.getDeclaredField(name);
+            } catch (NoSuchFieldException ex) {
+                return null;
+            }
+        }
+
+        field.setAccessible(true);
+
+        return field;
+    }
+
+    public static void onNewApp(Context context) {
+        if (context == null) return;
+
+        final String packageName = context.getPackageName();
+        final String processName = Application.getProcessName();
+
+        if (packageName == null || processName == null) return;
+
+        if (packageName.equals("com.google.android.gms") && processName.equals("com.google.android.gms.unstable")) {
+            try {
+                map.forEach((s, s2) -> {
+                    Field field = getFieldByName(s);
+                    if (field == null) return;
+                    try {
+                        field.set(null, s2);
+                    } catch (Throwable t) {
+                        Log.e(TAG, t.toString());
+                    }
+                });
+            } catch (Throwable t) {
+                Log.e(TAG, t.toString());
+            }
+        }
     }
 }
