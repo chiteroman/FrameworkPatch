@@ -2,7 +2,6 @@
 Modify framework.jar to build a valid certificate chain.
 
 ## Requirements
-- TEE must be reprogrammed with a valid keybox.
 - Intermediate Windows and Linux knowledge.
 - Intermediate Java and Smali knowledge.
 - WSL (only in Windows).
@@ -15,6 +14,14 @@ sudo apt update
 sudo apt full-upgrade -y
 sudo apt install -y default-jdk zipalign
 ```
+
+## SystemRW
+To make system rw you can use @lebigmac scripts: https://systemrw.com/download.php
+
+For my vayu, I used this: https://mega.nz/file/TQ42WApL#ky3OzPwEKQeKrFGJYygqEr07zsidEqYAd7lSu9-ceEM
+
+FLASH IN CUSTOM RECOVERY.
+AFTER FLASHING; REBOOT TO RECOVERY AGAIN TO START MODIFYING SYSTEM.
 
 ## Tutorial
 First, cd to a working (and clean) directory.
@@ -61,21 +68,22 @@ After .dex files are decompiled, you must search in folders for this files and m
 
 Search for method "engineGetCertificateChain" and near the end should be a line like this:
 ```
-aput-object v0, v2, v3
-return-object v2
+const/4 v4, 0x0
+aput-object v2, v3, v4
+return-object v3
 ```
 
 In this example:
 
-v0 -> leaf cert.
-v2 -> certificate chain.
-v3 -> 0, the position to insert the certificate in certificate chain.
+v2 -> leaf cert.
+v3 -> certificate chain.
+v4 -> 0, the position to insert the leaf cert in certificate chain.
 
 It may be different in your .smali file. Do not copy and paste...
 
-Before aput operation, you must add this:
+After aput operation, you must add this:
 ```
-invoke-static {XX}, Lcom/android/internal/util/framework/Android;->modifyCertificate(Ljava/security/cert/Certificate;)Ljava/security/cert/Certificate;
+invoke-static {XX}, Lcom/android/internal/util/framework/Android;->modifyCertificates([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
 move-result-object XX
 ```
 
@@ -83,10 +91,11 @@ Replace XX with the leaf certificate register.
 
 So the final code (in this example) should be this:
 ```
-invoke-static {v0}, Lcom/android/internal/util/framework/Android;->modifyCertificate(Ljava/security/cert/Certificate;)Ljava/security/cert/Certificate;
-move-result-object v0
-aput-object v0, v2, v3
-return-object v2
+const/4 v4, 0x0
+aput-object v2, v3, v4
+invoke-static {v3}, Lcom/android/internal/util/framework/Android;->modifyCertificates([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
+move-result-object v3
+return-object v3
 ```
 
 - Instrumentation.smali:
