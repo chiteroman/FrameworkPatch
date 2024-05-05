@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "es.chiteroman.framework"
+    namespace = "com.android.internal.util.framework"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "es.chiteroman.framework"
+        applicationId = "com.android.internal.util.framework"
         minSdk = 32
         targetSdk = 34
         versionCode = 1

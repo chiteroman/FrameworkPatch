@@ -51,27 +51,23 @@ public final class Android {
     private static final List<Certificate> RSA_CERTS = new ArrayList<>();
 
     static {
-        map.put("MANUFACTURER", "");
-        map.put("BRAND", "");
-        map.put("DEVICE", "");
-        map.put("PRODUCT", "");
-        map.put("MODEL", "");
-        map.put("FINGERPRINT", "");
+        map.put("MANUFACTURER", "motorola");
+        map.put("BRAND", "motorola");
+        map.put("DEVICE", "griffin");
+        map.put("PRODUCT", "griffin_retcn");
+        map.put("MODEL", "XT1650-05");
+        map.put("FINGERPRINT", "motorola/griffin_retcn/griffin:6.0.1/MCC24.246-37/42:user/release-keys");
+        map.put("SECURITY_PATCH", "2016-07-01");
+        map.put("ID", "MCC24.246-37");
 
         try {
-
             EC = parseKeyPair(Keybox.EC.PRIVATE_KEY);
-
-            EC_CERTS.add(parseCert(Keybox.EC.CERTIFICATE_0));
             EC_CERTS.add(parseCert(Keybox.EC.CERTIFICATE_1));
             EC_CERTS.add(parseCert(Keybox.EC.CERTIFICATE_2));
 
             RSA = parseKeyPair(Keybox.RSA.PRIVATE_KEY);
-
-            RSA_CERTS.add(parseCert(Keybox.RSA.CERTIFICATE_0));
             RSA_CERTS.add(parseCert(Keybox.RSA.CERTIFICATE_1));
             RSA_CERTS.add(parseCert(Keybox.RSA.CERTIFICATE_2));
-
         } catch (Throwable t) {
             Log.e(TAG, t.toString());
             throw new RuntimeException(t);
@@ -92,23 +88,17 @@ public final class Android {
         return new JcaX509CertificateConverter().getCertificate(new X509CertificateHolder(pemObject.getContent()));
     }
 
-    // TODO: create fake leaf cert for devices with broken TEE
-    private static Certificate createLeafCertificate() {
-        return null;
-    }
-
     public static Certificate[] modifyCertificates(Certificate[] certificates) {
-        if (certificates == null || certificates.length < 2) return certificates;
-        if (!(certificates[0] instanceof X509Certificate leaf)) return certificates;
+        if (certificates == null || certificates.length < 3 || !(certificates[0] instanceof X509Certificate leaf))
+            return certificates;
         try {
-            // You can force this to false if your keybox doesn't have EC keys
-            boolean isEC = KeyProperties.KEY_ALGORITHM_EC.equals(leaf.getPublicKey().getAlgorithm());
-
             X509CertificateHolder holder = new X509CertificateHolder(leaf.getEncoded());
 
             Extension ext = holder.getExtension(OID);
 
             if (ext == null) return certificates;
+
+            boolean isEC = KeyProperties.KEY_ALGORITHM_EC.equals(leaf.getPublicKey().getAlgorithm());
 
             ASN1Sequence sequence = ASN1Sequence.getInstance(ext.getExtnValue().getOctets());
 
@@ -119,7 +109,8 @@ public final class Android {
             ASN1EncodableVector vector = new ASN1EncodableVector(teeEnforced.size());
             for (ASN1Encodable asn1Encodable : teeEnforced) {
                 ASN1TaggedObject taggedObject = (ASN1TaggedObject) asn1Encodable;
-                if (taggedObject.getTagNo() == 704) continue;
+                if (taggedObject.getTagNo() == 704)
+                    continue;
                 vector.add(taggedObject);
             }
 
@@ -201,25 +192,24 @@ public final class Android {
     public static void onNewApp(Context context) {
         if (context == null) return;
 
-        final String packageName = context.getPackageName();
-        final String processName = Application.getProcessName();
+        String packageName = context.getPackageName();
+        String processName = Application.getProcessName();
 
-        if (packageName == null || processName == null) return;
+        if (packageName == null || processName == null || !packageName.equals("com.google.android.gms") || !processName.equals("com.google.android.gms.unstable"))
+            return;
 
-        if (packageName.equals("com.google.android.gms") && processName.equals("com.google.android.gms.unstable")) {
-            try {
-                map.forEach((s, s2) -> {
-                    Field field = getFieldByName(s);
-                    if (field == null) return;
-                    try {
-                        field.set(null, s2);
-                    } catch (Throwable t) {
-                        Log.e(TAG, t.toString());
-                    }
-                });
-            } catch (Throwable t) {
-                Log.e(TAG, t.toString());
-            }
+        try {
+            map.forEach((s, s2) -> {
+                Field field = getFieldByName(s);
+                if (field == null) return;
+                try {
+                    field.set(null, s2);
+                } catch (Throwable t) {
+                    Log.e(TAG, t.toString());
+                }
+            });
+        } catch (Throwable t) {
+            Log.e(TAG, t.toString());
         }
     }
 }
