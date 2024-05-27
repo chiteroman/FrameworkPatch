@@ -15,13 +15,15 @@ sudo apt full-upgrade -y
 sudo apt install -y default-jdk zipalign
 ```
 
-## SystemRW
-To make system rw you can use @lebigmac scripts: https://systemrw.com/download.php
+## WARNING
+**This is for advanced users, if you don't know about programming either Linux, this is not for you...**
 
-For my vayu, I used this: https://mega.nz/file/TQ42WApL#ky3OzPwEKQeKrFGJYygqEr07zsidEqYAd7lSu9-ceEM
+No support will be provided.
 
-FLASH IN CUSTOM RECOVERY.
-AFTER FLASHING; REBOOT TO RECOVERY AGAIN TO START MODIFYING SYSTEM.
+## How can I make my system rw?
+If you don't know how to do that just use a module for Magisk, KernelSU or APatch.
+
+Also, in modern devices, you must format data because modifying super partition breaks AVB.
 
 ## Tutorial
 First, cd to a working (and clean) directory.
@@ -56,10 +58,12 @@ public class AndroidKeyStoreSpi extends KeyStoreSpi
 public class Instrumentation 
 ````
 
-Now using baksmali.jar, decompile that .dex files:
+Now using baksmali.jar, decompile all .dex files:
 ```
-java -jar baksmali.jar d framework/classes3.dex -o classes3
-java -jar baksmali.jar d framework/classes.dex -o classes
+java -jar baksmali.jar d -a (ANDROID API LEVEL) framework/classes.dex -o classes
+java -jar baksmali.jar d -a (ANDROID API LEVEL) framework/classes2.dex -o classes2
+java -jar baksmali.jar d -a (ANDROID API LEVEL) framework/classes3.dex -o classes3
+...
 ```
 
 After .dex files are decompiled, you must search in folders for this files and modify like this:
@@ -83,7 +87,7 @@ It may be different in your .smali file. Do not copy and paste...
 
 After aput operation, you must add this:
 ```
-invoke-static {XX}, Lcom/android/internal/util/framework/Android;->modifyCertificates([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
+invoke-static {XX}, Lcom/android/internal/util/framework/Android;->engineGetCertificateChain([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
 move-result-object XX
 ```
 
@@ -93,7 +97,7 @@ So the final code (in this example) should be this:
 ```
 const/4 v4, 0x0
 aput-object v2, v3, v4
-invoke-static {v3}, Lcom/android/internal/util/framework/Android;->modifyCertificates([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
+invoke-static {v3}, Lcom/android/internal/util/framework/Android;->engineGetCertificateChain([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
 move-result-object v3
 return-object v3
 ```
@@ -107,26 +111,68 @@ invoke-static {XX}, Lcom/android/internal/util/framework/Android;->onNewApp(Land
 
 Replace XX with the Context register.
 
-Now compile again the files:
+- ApplicationPackageManager.smali
+
+Search for "hasSystemFeature" method:
 ```
-java -jar smali.jar a -a {API_LEVEL} classes3 -o framework/classes3.dex
-java -jar smali.jar a -a {API_LEVEL} classes -o framework/classes.dex
+.method public whitelist hasSystemFeature(Ljava/lang/String;)Z
+    .registers 3
+    .param p1, "name"    # Ljava/lang/String;
+
+    .line 768
+    const/4 v0, 0x0
+
+    invoke-virtual {p0, p1, v0}, Landroid/app/ApplicationPackageManager;->hasSystemFeature(Ljava/lang/String;I)Z
+
+    move-result v0
+
+    return v0
+.end method
 ```
 
-Replace {API_LEVEL} with the Android version you are running.
+And modify like this:
+```
+.method public whitelist hasSystemFeature(Ljava/lang/String;)Z
+    .registers 3
+    .param p1, "name"    # Ljava/lang/String;
+
+    .line 768
+    const/4 v0, 0x0
+
+    invoke-virtual {p0, p1, v0}, Landroid/app/ApplicationPackageManager;->hasSystemFeature(Ljava/lang/String;I)Z
+
+    move-result v0
+
+    invoke-static {v0, p1}, Lcom/android/internal/util/framework/Android;->hasSystemFeature(ZLjava/lang/String;)Z
+
+    move-result v0
+
+    return v0
+.end method
+```
+
+This hook is optional, but I recommend it if your device has Strongbox or app attest key support.
+
+Now compile all dex:
+```
+java -jar smali.jar a -a (ANDROID API LEVEL) classes -o framework/classes.dex
+java -jar smali.jar a -a (ANDROID API LEVEL) classes2 -o framework/classes2.dex
+java -jar smali.jar a -a (ANDROID API LEVEL) classes3 -o framework/classes3.dex
+...
+```
 
 Open this project in Android Studio and change EC and RSA keys, you must provide keybox private keys.
 Compile as release and copy classes.dex file.
 
-Now add a number greater than the one that already exists in the framework/.
+Use baksmali to decompile it and add to latest classesX folder.
 
-For example, if the greatest number is classes5.dex, you must copy it as classes6.dex
-
-Using 7zip recompile as .zip all framework/ files without compression.
+Using 7zip recompile as .zip all framework/ files **without** compression.
 
 After you have the framework.zip use zipalign:
 ```
 zipalign -f -p -v -z 4 framework.zip framework.jar
 ```
 
-Now move framework.jar to /system/framework, you can use Magisk module to replace it or mount /system as read-write and replace it.
+Now move framework.jar to /system/framework, you can use a module to replace it or mount /system as read-write and replace it.
+
+**Very important!** Remove all "boot-framework.*" files!

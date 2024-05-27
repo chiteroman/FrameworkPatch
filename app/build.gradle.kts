@@ -7,15 +7,9 @@ android {
     namespace = "com.android.internal.util.framework"
     compileSdk = 34
 
-    packaging {
-        resources {
-            excludes += "META-INF/**"
-        }
-    }
-
     defaultConfig {
         applicationId = "com.android.internal.util.framework"
-        minSdk = 34
+        minSdk = 28
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -38,5 +32,5 @@ android {
 }
 
 dependencies {
-    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    implementation("com.madgag.spongycastle:bcpkix-jdk15on:1.58.0.0")
 }
