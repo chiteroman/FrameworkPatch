@@ -8,7 +8,7 @@ Modify framework.jar to build a valid certificate chain.
 - Java.
 - 7zip.
 
-In GNU/Linux distro, install this packages (I use Ubuntu in WSL2):
+In GNU/Linux distro, install these packages (I use Ubuntu in WSL2):
 ```
 sudo apt update
 sudo apt full-upgrade -y
@@ -43,19 +43,23 @@ cd smali
 
 Then pick smali and baksmali fatJars and paste to working dir.
 
-Using 7zip extract framework.jar to framework/ directory.
+Using 7zip, extract framework.jar to framework/ directory.
 
-Now using [jadx](https://github.com/skylot/jadx) open framework.jar and check these classes:
+Now using [jadx](https://github.com/skylot/jadx), open framework.jar and check these classes:
 - android.security.keystore2.AndroidKeyStoreSpi
 - android.app.Instrumentation
+- android.app.ApplicationPackageManager
 
-You must check in where .dex they are, you can know by checking upper text in class declaration, something like this:
+You must check for the .dex they are in. You can know that by checking the text in the class declaration, something like this:
 ```
 /* loaded from: classes3.dex */
 public class AndroidKeyStoreSpi extends KeyStoreSpi
 
 /* loaded from: classes.dex */
-public class Instrumentation 
+public class Instrumentation
+
+/* loaded from: classes.dex */
+public class ApplicationPackageManager extends PackageManager
 ````
 
 Now using baksmali.jar, decompile all .dex files:
@@ -66,11 +70,11 @@ java -jar baksmali.jar d -a (ANDROID API LEVEL) framework/classes3.dex -o classe
 ...
 ```
 
-After .dex files are decompiled, you must search in folders for this files and modify like this:
+After all .dex files are decompiled, you must search in folders for these files and modify like this:
 
 - AndroidKeyStoreSpi.smali:
 
-Search for method "engineGetCertificateChain" and near the end should be a line like this:
+Search for method "engineGetCertificateChain" and there should be a line near the end like this:
 ```
 const/4 v4, 0x0
 aput-object v2, v3, v4
@@ -106,7 +110,7 @@ return-object v3
 
 Search for "newApplication" methods and before the return operation, add this:
 ```
-invoke-static {XX}, Lcom/android/internal/util/framework/Android;->onNewApp(Landroid/content/Context;)V
+invoke-static {XX}, Lcom/android/internal/util/framework/Android;->newApplication(Landroid/content/Context;)V
 ```
 
 Replace XX with the Context register.
@@ -124,9 +128,9 @@ Search for "hasSystemFeature" method:
 
     invoke-virtual {p0, p1, v0}, Landroid/app/ApplicationPackageManager;->hasSystemFeature(Ljava/lang/String;I)Z
 
-    move-result v0
+    move-result p1
 
-    return v0
+    return p1
 .end method
 ```
 
@@ -161,14 +165,17 @@ java -jar smali.jar a -a (ANDROID API LEVEL) classes3 -o framework/classes3.dex
 ...
 ```
 
-Open this project in Android Studio and change EC and RSA keys, you must provide keybox private keys.
-Compile as release and copy classes.dex file.
+Open this project in Android Studio and change EC and RSA keys, you must provide keybox private keys. Build project as release-build.
 
-Use baksmali to decompile it and add to latest classesX folder.
+Using 7zip, extract classes.dex from the project release .apk file.
 
-Using 7zip recompile as .zip all framework/ files **without** compression.
+Rename extracted classes.dex to classesX.dex where X is (the number of .dex files in framework/ directory) + 1.
 
-After you have the framework.zip use zipalign:
+Copy renamed classesX.dex into framework/ directory.
+
+Using 7zip, add all framework/ files to .zip archive **without** compression (Compression level: 0 - Store).
+
+After you have the framework.zip, use zipalign:
 ```
 zipalign -f -p -v -z 4 framework.zip framework.jar
 ```
