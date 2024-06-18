@@ -183,3 +183,9 @@ zipalign -f -p -v -z 4 framework.zip framework.jar
 Now move framework.jar to /system/framework, you can use a module to replace it or mount /system as read-write and replace it.
 
 **Very important!** Remove all "boot-framework.*" files!
+
+Lot of users need an extra step.
+
+If Key Attestation show AOSP certificate and BL is locked but can't pass even the BASIC, try install [PIF fork](https://github.com/osm0sis/PlayIntegrityFork) in script-only-mode or [Shamiko](https://github.com/LSPosed/LSPosed.github.io/releases) (depends of Magisk variant) to spoof sensitive props.
+
+Add Google Play Services/com.google.android.gms.unstable to DenyList/MagiskHide.
