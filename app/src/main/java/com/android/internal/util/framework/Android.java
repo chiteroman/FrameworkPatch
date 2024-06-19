@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.security.keystore.KeyProperties;
+import android.text.TextUtils;
 import android.util.Log;
 
 import org.lsposed.lsparanoid.Obfuscate;
@@ -28,12 +29,13 @@ import org.spongycastle.openssl.PEMParser;
 import org.spongycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.spongycastle.operator.ContentSigner;
 import org.spongycastle.operator.jcajce.JcaContentSignerBuilder;
-import org.spongycastle.util.io.pem.PemObject;
 import org.spongycastle.util.io.pem.PemReader;
 
+import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.lang.reflect.Field;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,6 +52,7 @@ public final class Android {
     private static final List<Certificate> EC_CERTS = new ArrayList<>();
     private static final List<Certificate> RSA_CERTS = new ArrayList<>();
     private static final Map<String, String> map = new HashMap<>();
+    private static final CertificateFactory certificateFactory;
 
     static {
         map.put("MANUFACTURER", "Google");
@@ -61,10 +64,12 @@ public final class Android {
         map.put("RELEASE", "8.1.0");
         map.put("ID", "OPM1.171019.011");
         map.put("INCREMENTAL", "4448085");
+        map.put("SECURITY_PATCH", "2017-12-05");
         map.put("TYPE", "user");
         map.put("TAGS", "release-keys");
-        map.put("SECURITY_PATCH", "2017-12-05");
         try {
+            certificateFactory = CertificateFactory.getInstance("X.509");
+
             EC = parseKeyPair(Keybox.EC.PRIVATE_KEY);
             EC_CERTS.add(parseCert(Keybox.EC.CERTIFICATE_1));
             EC_CERTS.add(parseCert(Keybox.EC.CERTIFICATE_2));
@@ -85,11 +90,9 @@ public final class Android {
     }
 
     private static Certificate parseCert(String cert) throws Throwable {
-        PemObject pemObject;
         try (PemReader reader = new PemReader(new StringReader(cert))) {
-            pemObject = reader.readPemObject();
+            return certificateFactory.generateCertificate(new ByteArrayInputStream(reader.readPemObject().getContent()));
         }
-        return new JcaX509CertificateConverter().getCertificate(new X509CertificateHolder(pemObject.getContent()));
     }
 
     private static Field getField(String fieldName) {
@@ -107,10 +110,7 @@ public final class Android {
     }
 
     public static boolean hasSystemFeature(boolean ret, String name) {
-        if (PackageManager.FEATURE_KEYSTORE_APP_ATTEST_KEY.equals(name)) {
-            return false;
-        }
-        if (PackageManager.FEATURE_STRONGBOX_KEYSTORE.equals(name)) {
+        if (PackageManager.FEATURE_KEYSTORE_APP_ATTEST_KEY.equals(name) || PackageManager.FEATURE_STRONGBOX_KEYSTORE.equals(name)) {
             return false;
         }
         return ret;
@@ -122,7 +122,7 @@ public final class Android {
         String packageName = context.getPackageName();
         String processName = Application.getProcessName();
 
-        if (packageName == null || processName == null) return;
+        if (TextUtils.isEmpty(packageName) || TextUtils.isEmpty(processName)) return;
 
         if (!"com.google.android.gms".equals(packageName)) return;
 
@@ -142,16 +142,17 @@ public final class Android {
     }
 
     public static Certificate[] engineGetCertificateChain(Certificate[] caList) {
-        if (caList == null) return null;
-        if (caList.length < 2) return caList;
+        if (caList == null) throw new UnsupportedOperationException();
         try {
-            X509CertificateHolder holder = new X509CertificateHolder(caList[0].getEncoded());
+            X509Certificate leaf = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(caList[0].getEncoded()));
 
-            X509Certificate leaf = new JcaX509CertificateConverter().getCertificate(holder);
+            byte[] bytes = leaf.getExtensionValue(OID.getId());
+
+            if (bytes == null) return caList;
+
+            X509CertificateHolder holder = new X509CertificateHolder(leaf.getEncoded());
 
             Extension ext = holder.getExtension(OID);
-
-            if (ext == null) return caList;
 
             ASN1Sequence sequence = ASN1Sequence.getInstance(ext.getExtnValue().getOctets());
 
